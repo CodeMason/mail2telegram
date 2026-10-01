@@ -4,3 +4,4 @@ export * from './parse';
 export * from './render';
 export * from './resend';
 export * from './summarization';
+export * from './spamFilter';
