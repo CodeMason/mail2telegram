@@ -100,8 +100,11 @@ export async function handleSpamGetRoute(req: any, env: any): Promise<Response> 
   let keywords = DEFAULT_KEYWORDS;
   if (env.DB) {
     try {
+      // Corrected to look into the native kv_store table structure
       const row = await env.DB.prepare("SELECT value FROM kv_store WHERE key = 'CONFIG_SPAM_KEYWORDS'").first() as { value: string } | null;
-      if (row?.value) keywords = JSON.parse(row.value);
+      if (row?.value) {
+        keywords = JSON.parse(row.value);
+      }
     } catch (e) {
       console.error("D1 schema fetch failed, using default keywords.", e);
     }
@@ -124,8 +127,9 @@ export async function handleSpamPostRoute(req: any, env: any): Promise<Response>
     }
 
     if (env.DB) {
+      // FIX: Removed updated_at column to strictly match mail2telegram's 2-column kv_store schema (key, value)
       await env.DB.prepare(
-        "INSERT OR REPLACE INTO kv_store (key, value, updated_at) VALUES ('CONFIG_SPAM_KEYWORDS', ?, datetime('now'))"
+        "INSERT OR REPLACE INTO kv_store (key, value) VALUES ('CONFIG_SPAM_KEYWORDS', ?)"
       ).bind(JSON.stringify(body.keywords)).run();
     }
     return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
