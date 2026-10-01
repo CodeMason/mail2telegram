@@ -44,7 +44,7 @@ export async function checkSpamScore(message: any, env: any): Promise<boolean> {
     try {
       const kvKeywords = await env.DB.prepare(
         "SELECT value FROM kv_store WHERE key = 'CONFIG_SPAM_KEYWORDS'"
-      ).bind().first<{ value: string }>();
+      ).bind().first() as { value: string } | null;
       
       if (kvKeywords?.value) {
         activeKeywords = JSON.parse(kvKeywords.value);
@@ -100,7 +100,7 @@ export async function handleSpamGetRoute(req: any, env: any): Promise<Response> 
   let keywords = DEFAULT_KEYWORDS;
   if (env.DB) {
     try {
-      const row = await env.DB.prepare("SELECT value FROM settings WHERE key = 'CONFIG_SPAM_KEYWORDS'").first<{ value: string }>();
+      const row = await env.DB.prepare("SELECT value FROM settings WHERE key = 'CONFIG_SPAM_KEYWORDS'").first() as { value: string } | null;
       if (row?.value) keywords = JSON.parse(row.value);
     } catch (e) {
       console.error("D1 schema fetch failed, using default keywords.", e);
