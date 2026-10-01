@@ -7,7 +7,7 @@ import type { AttachmentRecord, EmailRecord, Environment, ParsedEmailResult, Run
 import { Dao } from '../db';
 import { warnIfSchemaOutdated } from '../db/schema';
 import { loadDiscoveredDomain, loadSettings } from '../db/settings';
-import { hydrateEmail, isMessageBlock, parseEmail, renderEmailListMode } from '../mail';
+import { hydrateEmail, isMessageBlock, parseEmail, renderEmailListMode, checkSpamScore } from '../mail';
 import { createTelegramBotAPI } from '../telegram';
 
 const BODY_INLINE_LIMIT = 900 * 1024;
@@ -288,6 +288,13 @@ export async function emailHandler(
     if (isBlock && settings.blockPolicy.includes('reject')) {
         message.setReject('Blocked');
         return;
+    }
+
+    // Intercept immediately before mail2telegram parses or stores the message payload
+    const isSpam = await checkSpamScore(message, env);
+    if (isSpam) {
+      message.setReject("Blocked by structural header integrity scoring profiles.");
+      return;
     }
 
     const identity = await resolveMessageIdentity(message, settings);
