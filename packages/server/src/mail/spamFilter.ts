@@ -89,8 +89,7 @@ export async function checkSpamScore(message: any, env: any): Promise<boolean> {
  * Custom Mini App Router Interceptor
  * Plugs directly into itty-router handlers for management profiles.
  */
-export async function handleSpamApiRoute(request: Request, env: any): Promise<Response> {
-  const url = new URL(request.url);
+export async function handleSpamGetRoute(req: any, env: any): Promise<Response> {
   const corsHeaders = {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
@@ -98,38 +97,39 @@ export async function handleSpamApiRoute(request: Request, env: any): Promise<Re
     "Access-Control-Allow-Headers": "Content-Type"
   };
 
-  if (request.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  if (request.method === "GET") {
-    let keywords = DEFAULT_KEYWORDS;
-    if (env.DB) {
-      const row = await env.DB.prepare("SELECT value FROM kv_store WHERE key = 'CONFIG_SPAM_KEYWORDS'").first<{ value: string }>();
-      if (row?.value) keywords = JSON.parse(row.value);
-    }
-    return new Response(JSON.stringify({ success: true, data: keywords }), { headers: corsHeaders });
-  }
-
-  if (request.method === "POST") {
+  let keywords = DEFAULT_KEYWORDS;
+  if (env.DB) {
     try {
-      const body: any = await request.json();
-      if (!body.keywords || typeof body.keywords !== "object") {
-        return new Response(JSON.stringify({ success: false, error: "Invalid layout" }), { status: 400, headers: corsHeaders });
-      }
-
-      if (env.DB) {
-        // Upsert standard mapping configuration directly inside the mail2telegram SQL storage layer
-        await env.DB.prepare(
-          "INSERT OR REPLACE INTO kv_store (key, value, updated_at) VALUES ('CONFIG_SPAM_KEYWORDS', ?, datetime('now'))"
-        ).bind(JSON.stringify(body.keywords)).run();
-      }
-
-      return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
-    } catch (err: any) {
-      return new Response(JSON.stringify({ success: false, error: err.message }), { status: 500, headers: corsHeaders });
+      const row = await env.DB.prepare("SELECT value FROM settings WHERE key = 'CONFIG_SPAM_KEYWORDS'").first<{ value: string }>();
+      if (row?.value) keywords = JSON.parse(row.value);
+    } catch (e) {
+      console.error("D1 schema fetch failed, using default keywords.", e);
     }
   }
+  return new Response(JSON.stringify({ success: true, data: keywords }), { headers: corsHeaders });
+}
 
-  return new Response("Method not allowed", { status: 405 });
+export async function handleSpamPostRoute(req: any, env: any): Promise<Response> {
+  const corsHeaders = {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type"
+  };
+
+  try {
+    const body: any = await req.json();
+    if (!body.keywords || typeof body.keywords !== "object") {
+      return new Response(JSON.stringify({ success: false, error: "Malformed payload structure" }), { status: 400, headers: corsHeaders });
+    }
+
+    if (env.DB) {
+      await env.DB.prepare(
+        "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('CONFIG_SPAM_KEYWORDS', ?, datetime('now'))"
+      ).bind(JSON.stringify(body.keywords)).run();
+    }
+    return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
+  } catch (err: any) {
+    return new Response(JSON.stringify({ success: false, error: err.message }), { status: 500, headers: corsHeaders });
+  }
 }
