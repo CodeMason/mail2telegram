@@ -41,6 +41,8 @@ import {
     summarizeEmail,
     testAddressAgainstLists,
     validateAddressPattern,
+    handleSpamGetRoute,
+    handleSpamPostRoute,
 } from '../../mail';
 import { listOpenAiCompatibleModels, listWorkersAiTextModels } from '../../mail/summarization';
 import { createTelegramBotAPI, telegramCommands, telegramWebhookHandler } from '../../telegram';
@@ -740,6 +742,12 @@ function createRouter(env: Environment, configuredDomain?: string): RouterType {
         return await importSettingsFromEnv(dao, env);
     });
 
+    // ------------------------------------------------------------ spam configuration
+    
+    router.get("/api/spam-keywords", auth, (req: any) => handleSpamGetRoute(req, env));
+    router.post("/api/spam-keywords", auth, (req: any) => handleSpamPostRoute(req, env));
+
+    
     // ------------------------------------------------------------ webhook
 
     router.post('/telegram/:token/webhook', async (req: IRequest): Promise<any> => {
